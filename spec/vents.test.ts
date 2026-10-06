@@ -55,7 +55,7 @@ it("resonating twice from the same visitor only counts once", async () => {
 
   const after = await visitor.fetch("/").then((r) => r.text());
   const afterMatch = after.match(
-    new RegExp(`${marker}</p>[\\s\\S]*?共鸣 (\\d+)`),
+    new RegExp(`${marker}</p>[\\s\\S]*?Resonance (\\d+)`),
   );
   expect(afterMatch, "could not find the resonance count after resonating").not.toBeNull();
   expect(Number(afterMatch![1])).toBe(1);

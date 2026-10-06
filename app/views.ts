@@ -11,9 +11,9 @@ export function escapeHtml(input: string): string {
 
 function ventRow(vent: Vent): string {
   const button = vent.resonatedByVisitor
-    ? `<span class="resonated">共鸣已 +1</span>`
+    ? `<span class="resonated">Resonated +1</span>`
     : `<form method="post" action="/vents/${vent.id}/resonate" class="resonate-form">
-         <button type="submit">共鸣 +1</button>
+         <button type="submit">Resonate +1</button>
        </form>`;
 
   return `
@@ -21,7 +21,7 @@ function ventRow(vent: Vent): string {
       <p class="vent-course">${escapeHtml(vent.course)}</p>
       <p class="vent-body">${escapeHtml(vent.body)}</p>
       <div class="vent-meta">
-        <span class="vent-count">共鸣 ${vent.resonanceCount}</span>
+        <span class="vent-count">Resonance ${vent.resonanceCount}</span>
         ${button}
       </div>
     </li>`;
@@ -30,14 +30,14 @@ function ventRow(vent: Vent): string {
 export function renderPage(vents: Vent[]): string {
   const rows = vents.length > 0
     ? vents.map(ventRow).join("\n")
-    : `<li class="empty">还没有吐槽——来写第一条吧。</li>`;
+    : `<li class="empty">No vents yet — write the first one.</li>`;
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>课程吐槽墙</title>
+    <title>Course Vent Wall</title>
     <style>
       body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
       .vent { border: 1px solid #ddd; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
@@ -53,12 +53,12 @@ export function renderPage(vents: Vent[]): string {
     </style>
   </head>
   <body>
-    <h1>课程吐槽墙</h1>
-    <p><a href="/readme/">这是什么 / 规则</a></p>
+    <h1>Course Vent Wall</h1>
+    <p><a href="/readme/">What is this / Rules</a></p>
     <form method="post" action="/vents" class="post-form">
-      <input type="text" name="course" placeholder="课程代码，例如 COMP8020" maxlength="80" required />
-      <textarea name="body" placeholder="匿名吐槽……对事不对人" maxlength="500" rows="3" required></textarea>
-      <button type="submit">匿名发布</button>
+      <input type="text" name="course" placeholder="Course code, e.g. COMP8020" maxlength="80" required />
+      <textarea name="body" placeholder="Vent anonymously… go after the issue, not the person" maxlength="500" rows="3" required></textarea>
+      <button type="submit">Post anonymously</button>
     </form>
     <ul>
       ${rows}

@@ -3,7 +3,7 @@
 ## What this is
 
 A proof-of-life version of the course vent wall: an anonymous board where
-anyone posts a gripe about an ANU course and others click "共鸣 +1" if they
+anyone posts a gripe about an ANU course and others click "Resonate +1" if they
 agree. The README argues what "good" means for it; this file is about how it
 got built.
 

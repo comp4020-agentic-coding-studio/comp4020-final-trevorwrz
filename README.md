@@ -1,8 +1,8 @@
-# 课程吐槽墙 (Course Vent Wall)
+# Course Vent Wall
 
 A place to anonymously vent about any ANU course, and see that other people
 feel the same way. Post a short gripe tagged with a course code, read
-everyone else's, and click "共鸣 +1" on the ones you agree with. The wall
+everyone else's, and click "Resonate +1" on the ones you agree with. The wall
 sorts by resonance count, so the complaint the most people share about floats
 to the top.
 

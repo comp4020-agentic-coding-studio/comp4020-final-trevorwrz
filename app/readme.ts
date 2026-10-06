@@ -9,11 +9,11 @@ export function renderReadme(readmePath: string): string {
   const body = escapeHtml(readFileSync(readmePath, "utf8"));
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>关于 / README</title>
+    <title>About / README</title>
     <style>
       body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
       pre { white-space: pre-wrap; word-break: break-word; font-family: inherit; }
@@ -21,7 +21,7 @@ export function renderReadme(readmePath: string): string {
     </style>
   </head>
   <body>
-    <a class="back" href="/">&larr; 返回吐槽墙</a>
+    <a class="back" href="/">&larr; Back to vent wall</a>
     <pre>${body}</pre>
   </body>
 </html>`;
