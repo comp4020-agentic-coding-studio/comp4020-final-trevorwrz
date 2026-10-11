@@ -131,6 +131,18 @@ than being squeezed in at the end of this one.
   symptom actually lived at (instrumenting both sides and reading output)
   rather than silencing the failure by loosening the deadline, which would
   have hidden a real intermittent bug under a longer wait.
+- I checked the spec test against the real target, not just localhost:
+  after deploying, I ran `pnpm check` with `APP_URL` pointed at the live Fly
+  URL and found the resonate test flaky there specifically, even though it
+  was solid after 8 straight local runs. The cause was a connection-timing
+  race that only shows up over a real network: `fetch("/events")` resolving
+  with headers doesn't guarantee the server's handler has reached
+  `addClient()` yet, and over the internet that gap is wide enough to
+  occasionally race against an action triggered right after. The fix makes
+  each test explicitly wait for the connection's own preamble line before
+  triggering anything, which is also closer to what a real client should do.
+  I wouldn't have caught this testing only against localhost, where that gap
+  is too small to ever lose the race.
 - I grounded "no reload" by hand, not just by the spec test: against the
   local dev server, I opened one terminal session watching `/events` live
   and, from a second, independent session (its own cookie jar — a different

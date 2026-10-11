@@ -2,24 +2,24 @@ import { expect, inject, it } from "vitest";
 
 const baseUrl = inject("baseUrl");
 
-// Reads Server-Sent Events off a fetch() response body, resolving as soon as
-// one full "event:"-prefixed message has arrived, or rejecting after a
-// deadline. This is the spec's "within about a second" requirement made
-// mechanical: it fails loudly if a change stops reaching open connections at
-// all, rather than only being checkable by eye at the crit. The deadline
-// below is looser than the brief's "about a second" on purpose — it's
-// proving the push mechanism works, not benchmarking latency, and a local
-// test run adds its own scheduling noise on top of the real push.
-async function nextEvent(stream: ReadableStream<Uint8Array>, deadlineMs: number): Promise<string> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+// Reads Server-Sent Events off an already-open reader, resolving as soon as
+// a chunk matching `want` has arrived (checked against everything read so
+// far, including anything left over from a previous call), or rejecting
+// after a deadline. A single outstanding reader.read() at a time, cancelled
+// from outside on timeout, rather than racing a fresh read() against a timer
+// each loop: racing re-issues read() on every tick it loses, and a reader
+// only ever has one read pending — two in flight at once is what was
+// actually making this flaky, not the server.
+async function readUntil(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  decoder: TextDecoder,
+  leftover: string,
+  want: string,
+  deadlineMs: number,
+): Promise<string> {
+  let buffer = leftover;
+  if (buffer.includes(want)) return buffer;
 
-  // A single outstanding reader.read() at a time, cancelled from outside on
-  // timeout, rather than racing a fresh read() against a timer each loop:
-  // racing re-issues read() on every tick it loses, and a reader only ever
-  // has one read pending — two in flight at once is what was actually
-  // making this flaky, not the server.
   const timer = setTimeout(() => {
     reader.cancel().catch(() => {});
   }, deadlineMs);
@@ -29,12 +29,37 @@ async function nextEvent(stream: ReadableStream<Uint8Array>, deadlineMs: number)
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      if (buffer.includes("event: changed")) return buffer;
+      if (buffer.includes(want)) return buffer;
     }
   } finally {
     clearTimeout(timer);
   }
-  throw new Error(`no "changed" event arrived within ${deadlineMs}ms`);
+  throw new Error(`"${want}" did not arrive within ${deadlineMs}ms`);
+}
+
+// Opens the SSE connection and waits for the preamble line the server writes
+// immediately after registering the client (see app/server.ts's "/events"
+// handler). Only once that's back is the connection actually registered to
+// receive a broadcast — over a real network (the live Fly deploy, not just
+// localhost), `fetch()` resolving with headers can land slightly before the
+// server's own addClient() call has happened, which raced against an action
+// triggered right after was the source of this spec's flakiness against a
+// deployed instance.
+async function openEventStream(watcher: ReturnType<typeof jar>): Promise<{
+  reader: ReadableStreamDefaultReader<Uint8Array>;
+  decoder: TextDecoder;
+  leftover: string;
+}> {
+  const body = await watcher
+    .fetch("/events", { headers: { accept: "text/event-stream" } })
+    .then((r) => {
+      if (!r.body) throw new Error("no readable stream on /events response");
+      return r.body;
+    });
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const leftover = await readUntil(reader, decoder, "", "retry:", 3_000);
+  return { reader, decoder, leftover };
 }
 
 function jar() {
@@ -58,13 +83,9 @@ it("a vent posted by one visitor reaches another visitor's open session within a
   const watcher = jar();
 
   // Establish the watcher's SSE connection first, same as a tab that was
-  // already open when someone else posts.
-  const stream = await watcher
-    .fetch("/events", { headers: { accept: "text/event-stream" } })
-    .then((r) => {
-      if (!r.body) throw new Error("no readable stream on /events response");
-      return r.body;
-    });
+  // already open when someone else posts — and wait for it to actually be
+  // registered server-side before triggering anything.
+  const { reader, decoder, leftover } = await openEventStream(watcher);
 
   const marker = `realtime-${crypto.randomUUID()}`;
   await poster.fetch("/vents", {
@@ -73,7 +94,7 @@ it("a vent posted by one visitor reaches another visitor's open session within a
     body: new URLSearchParams({ course: "COMP8020", body: marker }).toString(),
   });
 
-  await nextEvent(stream, 3_000);
+  await readUntil(reader, decoder, leftover, "event: changed", 3_000);
 
   // The event itself carries no data; the watcher's own next step would be
   // to re-fetch their personalised fragment, which this confirms reflects
@@ -100,15 +121,10 @@ it("resonating a vent broadcasts to other open sessions too, not just new vents"
   const ventId = match![1];
 
   const watcher = jar();
-  const stream = await watcher
-    .fetch("/events", { headers: { accept: "text/event-stream" } })
-    .then((r) => {
-      if (!r.body) throw new Error("no readable stream on /events response");
-      return r.body;
-    });
+  const { reader, decoder, leftover } = await openEventStream(watcher);
 
   const resonator = jar();
   await resonator.fetch(`/vents/${ventId}/resonate`, { method: "POST" });
 
-  await nextEvent(stream, 3_000);
+  await readUntil(reader, decoder, leftover, "event: changed", 3_000);
 });
