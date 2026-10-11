@@ -27,11 +27,19 @@ function ventRow(vent: Vent): string {
     </li>`;
 }
 
-export function renderPage(vents: Vent[]): string {
+// The live-updating part of the page, on its own: both the full page (first
+// load) and GET /vents/fragment (what a connected tab re-fetches when the
+// SSE channel pings "changed") render through this one function, so the two
+// can never drift into different markup for the same data.
+export function renderVentList(vents: Vent[]): string {
   const rows = vents.length > 0
     ? vents.map(ventRow).join("\n")
     : `<li class="empty">🫙 No vents yet — write the first one.</li>`;
 
+  return `<ul id="vents">\n${rows}\n</ul>`;
+}
+
+export function renderPage(vents: Vent[]): string {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -191,10 +199,31 @@ export function renderPage(vents: Vent[]): string {
         <textarea name="body" placeholder="Vent anonymously… go after the issue, not the person" maxlength="500" rows="3" required></textarea>
         <button type="submit">Post anonymously</button>
       </form>
-      <ul>
-        ${rows}
-      </ul>
+      ${renderVentList(vents)}
     </div>
+    <script>
+      // Progressive enhancement only: every form above still works with no
+      // JS at all (plain POST, 303 redirect, full page). This just makes
+      // OTHER people's changes show up without a reload, per crit 9's "within
+      // about a second, no reload" requirement — it never touches what the
+      // submitting visitor's own browser does with their own action.
+      if (window.EventSource) {
+        const source = new EventSource("/events");
+        source.addEventListener("changed", async () => {
+          try {
+            const res = await fetch("/vents/fragment", { credentials: "same-origin" });
+            if (!res.ok) return;
+            const html = await res.text();
+            const current = document.getElementById("vents");
+            if (current) current.outerHTML = html;
+          } catch {
+            // A dropped fetch just means this tab stays stale until the next
+            // "changed" event or a manual reload — never worth surfacing to
+            // the visitor over an anonymous vent wall.
+          }
+        });
+      }
+    </script>
   </body>
 </html>`;
 }
