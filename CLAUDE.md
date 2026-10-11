@@ -15,6 +15,11 @@ on this app must never violate, regardless of what feature it's building.
   IP logging surfaced anywhere in the UI. The anonymous `visitor_id` cookie
   exists only to dedupe resonances — don't repurpose it to show "who posted
   what" anywhere.
+- **No presence indicator.** No viewer count, no "N people here" badge, no UI
+  derived from how many `/events` connections are open. Decided deliberately
+  in `docs/decisions/0002-presence-and-broadcast-scope.md`; a real-time
+  feature that surfaces how many people are watching needs a new decision
+  record before it ships, not a one-line addition to `app/events.ts`.
 - **Vents are never deleted or edited by the app itself.** `README.md`
   promises permanence; a feature that prunes, expires, or edits existing
   vents needs a new README section (and a new decision record) before it

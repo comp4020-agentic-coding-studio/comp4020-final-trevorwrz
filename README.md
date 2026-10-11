@@ -6,10 +6,11 @@ everyone else's, and click "Resonate +1" on the ones you agree with. The wall
 sorts by resonance count, so the complaint the most people share about floats
 to the top.
 
-This is the week 9 ("It's alive!") version: proof that the core loop works
-and survives a redeploy. Real-time updates, moderation tooling, and the full
-multi-user polish the final project eventually needs are deliberately not
-here yet — see "What's deferred" below.
+This is the week 10 ("All at once") version: the wall is real-time now — a
+vent or a resonance posted in one tab shows up in every other open tab
+within about a second, with no reload. Moderation tooling and the rest of
+the multi-user polish the final project eventually needs are still
+deliberately not here — see "What's deferred" below.
 
 ## Who it's for
 
@@ -37,15 +38,13 @@ more courses mixed in.
   for nothing more than a course code and a sentence. The barrier to
   participation is deliberately almost zero — that's what makes "proof of
   life" meaningful this week: a stranger really can just show up and use it.
+- **No presence indicator.** The wall never shows who else is connected, or
+  how many — not a viewer count, not a "someone's here" badge. Anonymity
+  means not knowing you're the only one reading, not just not knowing which
+  one anyone is. See `docs/decisions/0002-presence-and-broadcast-scope.md`.
 
 ## What's deferred
 
-- **Real-time:** a new vent or resonance only appears when you reload. The
-  final project needs this to propagate live; that's the target for crit 9
-  ("All at once"), likely via Server-Sent Events given the read-heavy,
-  write-light shape of this app (see `docs/decisions/0001-stack.md`).
-  Decided now, deliberately: good spec says the spec checks for proof-of-life
-  signs only, "the real-time layer... can all wait."
 - **Moderation:** nothing currently stops a vent from naming a person. A
   later version needs at least a report button and a way to remove a post.
 - **Course validation:** the course field is free text, not checked against
