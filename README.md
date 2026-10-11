@@ -8,9 +8,12 @@ to the top.
 
 This is the week 10 ("All at once") version: the wall is real-time now — a
 vent or a resonance posted in one tab shows up in every other open tab
-within about a second, with no reload. Moderation tooling and the rest of
-the multi-user polish the final project eventually needs are still
-deliberately not here — see "What's deferred" below.
+within about a second, with no reload. There's also a
+[course leaderboard](/courses/), ranking courses by total resonance across
+their vents — the same "everyone agrees" effect, one level up from a single
+vent. Moderation tooling and the rest of the multi-user polish the final
+project eventually needs are still deliberately not here — see "What's
+deferred" below.
 
 ## Who it's for
 
@@ -42,6 +45,13 @@ more courses mixed in.
   how many — not a viewer count, not a "someone's here" badge. Anonymity
   means not knowing you're the only one reading, not just not knowing which
   one anyone is. See `docs/decisions/0002-presence-and-broadcast-scope.md`.
+- **Growth means sharper, not bigger.** The obvious way to make this feel
+  more like a "real" final project was to bolt on a forum — replies,
+  accounts, threads. That's rejected on purpose: it's the generic answer the
+  final project brief explicitly warns against, and it needs an identity
+  model this app doesn't have. The course leaderboard exists instead because
+  it's a sharper view of the same value this app already has, not a new one.
+  See `docs/decisions/0003-course-leaderboard.md`.
 
 ## What's deferred
 

@@ -2,26 +2,35 @@
 
 ## What this is
 
-A proof-of-life version of the course vent wall: an anonymous board where
-anyone posts a gripe about an ANU course and others click "Resonate +1" if they
-agree. The README argues what "good" means for it; this file is about how it
-got built.
+The course vent wall: an anonymous board where anyone posts a gripe about an
+ANU course and others click "Resonate +1" if they agree, sorted so the
+complaint the most people share floats to the top. As of crit 9 it's also
+real-time (a change in one tab reaches every other open tab within about a
+second, no reload) and has a second view, the course leaderboard, ranking
+courses by total resonance. `README.md` argues what "good" means for it;
+this file is about how it got built and stays rewritten each crit to reflect
+where the project actually is, not a log of what happened when.
 
-## Choosing the stack
+## The decisions, in order
 
-[`982ae7f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/982ae7f)
-is the decision record (`docs/decisions/0001-stack.md`): Node 24 running
-TypeScript directly (no build step — verified locally before committing to
-it), Express for three routes, `node:sqlite` instead of `better-sqlite3` to
-avoid a native addon in the Docker image, and server-rendered HTML with no
-client framework, since the whole interaction is two form posts and a page
-load.
+- [`0001-stack.md`](docs/decisions/0001-stack.md): Node 24 running `.ts`
+  directly, Express, `node:sqlite`, server-rendered HTML with no client
+  framework — small enough that a heavier stack would be solving a problem
+  this app doesn't have.
+- [`0002-presence-and-broadcast-scope.md`](docs/decisions/0002-presence-and-broadcast-scope.md):
+  every write (not just new vents) broadcasts live, but no presence
+  indicator — a live viewer count was cheap to add once SSE existed, and
+  rejected anyway because it conflicts with "anonymous, always."
+- [`0003-course-leaderboard.md`](docs/decisions/0003-course-leaderboard.md):
+  a course leaderboard, not a bigger forum — the generic move (comments,
+  accounts) was rejected as the brief's named "median answer"; ranking
+  courses by total resonance amplifies the app's actual value proposition
+  instead of bolting on an unrelated feature.
 
-## Order of work
+## How it was built
 
-[`619d8c6...982ae7f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/compare/619d8c6...982ae7f)
-is the whole build, committed in the order I actually did it: dependencies
-and config first, then the schema and anonymous-visitor cookie
+Crit 8's build, in commit order: dependencies and config, then the schema
+and anonymous-visitor cookie
 ([`3434427`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/3434427)),
 then routes and rendering
 ([`36f1a41`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/36f1a41)),
@@ -30,9 +39,29 @@ then the spec
 then the README/CLAUDE.md pair
 ([`7711dcb`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/7711dcb)),
 then the real Dockerfile
-([`5724bca`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/5724bca)).
+([`5724bca`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/5724bca)),
+then the stack decision record
+([`982ae7f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/982ae7f)).
+
+Crit 9 added real-time on top of that: the broadcast channel and
+`/events`/`/vents/fragment` routes
+([`d3b2b40`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/d3b2b40)),
+then `spec/realtime.test.ts`
+([`f40ba15`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/f40ba15)),
+then the concurrency decision record
+([`6808b6a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/6808b6a)),
+then the README/CLAUDE.md updates it implies
+([`90836f4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/90836f4)),
+then a fix to the spec's own flakiness against the live deployment
+([`cc07aa2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/cc07aa2)).
+Then the course leaderboard, riding the same broadcast rather than inventing
+new plumbing: `listCourseLeaderboard()` in `app/db.ts`, `/courses` and
+`/courses/fragment` in `app/server.ts`, its own spec, and
+`docs/decisions/0003-course-leaderboard.md`.
 
 ## Directing, grounding and correcting the agent's work
+
+**Picking and scoping the idea (crit 8):**
 
 - I picked the app from a list of example ideas the agent proposed (social
   space / game / instrument / tool / satire) rather than accepting the first
@@ -58,44 +87,7 @@ then the real Dockerfile
   rather than trusting that `escapeHtml()` was used everywhere just because
   it existed.
 
-## What I'd do differently next crit
-
-Real-time (SSE, per the ADR) is the obvious next step and is deliberately
-not here — the crit 8 spec only asks for proof of life, and a correct
-real-time layer deserves its own decision record and its own crit rather
-than being squeezed in at the end of this one.
-
-## Crit 9: making it real-time ("All at once")
-
-### What changed
-
-- `app/events.ts` is new: a module-level `Set<Response>` of open `/events`
-  connections and a `broadcastChange()` that writes one `event: changed`
-  SSE message to each of them. It carries no payload on purpose — see
-  `docs/decisions/0002-presence-and-broadcast-scope.md`.
-- `app/server.ts` gained `GET /events` (the SSE stream, with a 15s heartbeat
-  so Fly's proxy doesn't time out an idle connection) and
-  `GET /vents/fragment` (the same vent-list markup `/` renders, on its own,
-  scoped to whichever visitor cookie requests it). Both `POST /vents` and
-  `POST /vents/:id/resonate` now call `broadcastChange()` after writing.
-- `app/views.ts` split `renderVentList()` out of `renderPage()` so the full
-  page and the fragment endpoint render from the exact same function — they
-  can't drift into different markup for the same data. `renderPage()` also
-  gained a small inline `<script>`: on a `changed` event it re-fetches
-  `/vents/fragment` and swaps it in. Every form on the page still works with
-  JS disabled; this only affects what *other* open tabs see.
-- `docs/decisions/0002-presence-and-broadcast-scope.md` is the crit's
-  required decision record: broadcast every write (not just new vents), and
-  no presence indicator — argued against showing a live viewer count, which
-  SSE would make nearly free to add but which conflicts with the "anonymous,
-  always" promise in `README.md`.
-- `spec/realtime.test.ts` is new: it opens a real SSE connection as one
-  visitor, has a second visitor post (and separately, resonate), and asserts
-  the first visitor's stream receives a `changed` event — the "within about
-  a second, no reload" requirement made mechanical rather than only
-  checkable by eye at the crit.
-
-### Directing, grounding and correcting the agent's work
+**Making it real-time (crit 9):**
 
 - I had the agent read `docs/decisions/0001-stack.md` before writing any
   code: it already named SSE as "the leading candidate for crit 9" and gave
@@ -155,3 +147,48 @@ than being squeezed in at the end of this one.
   reloading or acting at all. This is the same shape as two browser tabs,
   done over curl so the timing of each push is visible in the terminal
   rather than trusted by eye.
+
+**Adding the course leaderboard (crit 9, after reviewing the week 8 build):**
+
+- I judged the wall as a final-project artefact and found it under-built,
+  not wrong — and rejected my own first instinct to fix that by making it
+  bigger and more generic (a forum, with replies and accounts). Re-reading
+  the brief's own warning against "the median answer" (a chat room with the
+  nouns swapped) and its list of features that are "other apps' answers"
+  (accounts, profiles, feeds, scores) is what redirected that instinct
+  toward something smaller and more specific to this app instead.
+- I had the agent consider and reject three alternatives in
+  `docs/decisions/0003-course-leaderboard.md` before building anything: a
+  reply system (the generic move), a per-vent trending list (adds a view
+  without adding a question), and an individual leaderboard (no stable
+  identity to rank, and `CLAUDE.md` already bans repurposing `visitor_id`
+  for exactly that). Writing down what got rejected and why is what made
+  this a defended choice rather than the first idea that came up.
+- I corrected a normalisation gap before it became a visible bug: the
+  course field has always been free text (`README.md`'s own "What's
+  deferred" flags this), which doesn't matter when every vent is read on
+  its own, but would show "COMP8020" and "comp8020" as two separate rows
+  once they're side by side on a ranked list. I had the query group by
+  `UPPER(TRIM(course))` rather than the raw column, and wrote
+  `spec/courses.test.ts` to check it directly, rather than leaving it as a
+  thing that would only surface by accident once real messy input arrived.
+- I caught two bugs in my own new spec tests, not the app: both
+  `spec/courses.test.ts` and the new leaderboard case in
+  `spec/realtime.test.ts` generated course codes with
+  `crypto.randomUUID()`, which produces lowercase hex, then checked for
+  that exact (mixed-case) string in the rendered output — which the
+  normalisation above correctly never produces. The first full test run
+  failed deterministically (not flaky — the same two tests, every time),
+  which was itself useful signal that this was a real, fixable test bug and
+  not a timing issue to chase; the fix was uppercasing the generated course
+  codes to match what the app actually stores.
+
+## What's next
+
+Crit 10 ("Fly by instruments") asks for multi-user: two classmates using the
+deployed URL at once while I watch via logs. The real-time layer and the
+leaderboard both already assume concurrent writers (the resonance dedup
+predates this crit; the SSE broadcast has no single-writer assumption baked
+in), so the work ahead is less "make it multi-user" and more "find out
+where that assumption is wrong" — deliberately trying to break simultaneous
+posts and resonances rather than just demonstrating the happy path.
