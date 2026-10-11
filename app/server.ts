@@ -1,7 +1,7 @@
 import express from "express";
 import { join } from "node:path";
-import { addResonance, createVent, listVents } from "./db.ts";
-import { renderPage, renderVentList } from "./views.ts";
+import { addResonance, createVent, listCourseLeaderboard, listVents } from "./db.ts";
+import { renderCourseList, renderCoursesPage, renderPage, renderVentList } from "./views.ts";
 import { renderReadme } from "./readme.ts";
 import { getOrSetVisitorId } from "./visitor.ts";
 import { addClient, broadcastChange, removeClient } from "./events.ts";
@@ -20,6 +20,14 @@ app.get("/", (req, res) => {
 app.get("/vents/fragment", (req, res) => {
   const visitorId = getOrSetVisitorId(req, res);
   res.type("html").send(renderVentList(listVents(visitorId)));
+});
+
+app.get("/courses", (_req, res) => {
+  res.type("html").send(renderCoursesPage(listCourseLeaderboard()));
+});
+
+app.get("/courses/fragment", (_req, res) => {
+  res.type("html").send(renderCourseList(listCourseLeaderboard()));
 });
 
 app.post("/vents", (req, res) => {

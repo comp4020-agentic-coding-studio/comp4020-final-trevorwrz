@@ -1,4 +1,4 @@
-import type { Vent } from "./db.ts";
+import type { CourseStat, Vent } from "./db.ts";
 
 export function escapeHtml(input: string): string {
   return input
@@ -39,14 +39,10 @@ export function renderVentList(vents: Vent[]): string {
   return `<ul id="vents">\n${rows}\n</ul>`;
 }
 
-export function renderPage(vents: Vent[]): string {
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Course Vent Wall</title>
-    <style>
+// Shared between the wall ("/") and the course leaderboard ("/courses"):
+// one page shell so the two never drift into inconsistent styling, and a
+// new page doesn't mean a second copy of this CSS to keep in sync.
+const pageStyles = `
       :root {
         --ink: #1e1b2e;
         --muted: #716d8a;
@@ -184,7 +180,101 @@ export function renderPage(vents: Vent[]): string {
         padding: 2rem 1rem;
         background: var(--card);
       }
-    </style>
+      .nav-links {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin: 0.1rem 0 0.4rem;
+      }
+      ol.course-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
+      .course-row {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        background: var(--card);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--accent3);
+        border-radius: 0.85rem;
+        padding: 0.85rem 1.1rem;
+        box-shadow: 0 14px 30px -22px rgba(30, 27, 46, 0.3);
+      }
+      .course-rank { font-weight: 700; color: var(--accent1); width: 1.75rem; text-align: center; flex-shrink: 0; }
+      .course-name { font-weight: 700; flex: 1; }
+      .course-stats { font-size: 0.85rem; color: var(--muted); text-align: right; white-space: nowrap; }
+`;
+
+function courseRow(stat: CourseStat, rank: number): string {
+  return `
+    <li class="course-row">
+      <span class="course-rank">#${rank}</span>
+      <span class="course-name">${escapeHtml(stat.course)}</span>
+      <span class="course-stats">${stat.totalResonance} resonance · ${stat.ventCount} vent${stat.ventCount === 1 ? "" : "s"}</span>
+    </li>`;
+}
+
+// Same split-out-fragment shape as renderVentList(): the full /courses page
+// and GET /courses/fragment (what a connected tab re-fetches on the same
+// "changed" SSE ping the wall already listens for — this leaderboard rides
+// the broadcast crit 9 built, rather than needing its own) render through
+// this one function.
+export function renderCourseList(stats: CourseStat[]): string {
+  const rows = stats.length > 0
+    ? stats.map((s, i) => courseRow(s, i + 1)).join("\n")
+    : `<li class="empty">🫙 No vents yet — nothing to rank.</li>`;
+
+  return `<ol id="courses-list" class="course-list">\n${rows}\n</ol>`;
+}
+
+export function renderCoursesPage(stats: CourseStat[]): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Course Leaderboard — Vent Wall</title>
+    <style>${pageStyles}</style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <div class="badge">🏆</div>
+        <h1>Course Leaderboard</h1>
+        <p class="tagline">Which courses the whole wall agrees are rough right now.</p>
+        <p class="nav-links"><a href="/">&larr; Back to the wall</a> · <a href="/readme/">What is this / Rules</a></p>
+      </header>
+      ${renderCourseList(stats)}
+    </div>
+    <script>
+      if (window.EventSource) {
+        const source = new EventSource("/events");
+        source.addEventListener("changed", async () => {
+          try {
+            const res = await fetch("/courses/fragment", { credentials: "same-origin" });
+            if (!res.ok) return;
+            const html = await res.text();
+            const current = document.getElementById("courses-list");
+            if (current) current.outerHTML = html;
+          } catch {
+            // Same stance as the wall's own listener: a dropped fetch just
+            // means this tab stays stale until the next ping.
+          }
+        });
+      }
+    </script>
+  </body>
+</html>`;
+}
+
+export function renderPage(vents: Vent[]): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Course Vent Wall</title>
+    <style>${pageStyles}</style>
   </head>
   <body>
     <div class="wrap">
@@ -192,7 +282,7 @@ export function renderPage(vents: Vent[]): string {
         <div class="badge">📣</div>
         <h1>Course Vent Wall</h1>
         <p class="tagline">Anonymous gripes, sorted by how many people feel the same.</p>
-        <p><a href="/readme/">What is this / Rules</a></p>
+        <p class="nav-links"><a href="/courses">🏆 Course leaderboard</a> · <a href="/readme/">What is this / Rules</a></p>
       </header>
       <form method="post" action="/vents" class="post-form">
         <input type="text" name="course" placeholder="Course code, e.g. COMP8020" maxlength="80" required />

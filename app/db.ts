@@ -11,6 +11,12 @@ export interface Vent {
   resonatedByVisitor: boolean;
 }
 
+export interface CourseStat {
+  course: string;
+  ventCount: number;
+  totalResonance: number;
+}
+
 const dataDir = process.env.DATA_DIR ?? "./data";
 mkdirSync(dataDir, { recursive: true });
 
@@ -51,6 +57,25 @@ const selectVents = db.prepare(`
   GROUP BY v.id
   ORDER BY resonanceCount DESC, v.created_at DESC
 `);
+
+// Grouped by UPPER(TRIM(course)) rather than the raw column: the course
+// field is free text (README's "what's deferred" already flags this), and
+// without normalising, "COMP8020" and "comp8020 " would show up as two
+// separate rows on a leaderboard where that'd read as a bug, not a quirk.
+const selectCourseLeaderboard = db.prepare(`
+  SELECT
+    UPPER(TRIM(v.course)) AS course,
+    COUNT(DISTINCT v.id) AS ventCount,
+    COUNT(r.visitor_id) AS totalResonance
+  FROM vents v
+  LEFT JOIN resonances r ON r.vent_id = v.id
+  GROUP BY UPPER(TRIM(v.course))
+  ORDER BY totalResonance DESC, ventCount DESC, course ASC
+`);
+
+export function listCourseLeaderboard(): CourseStat[] {
+  return selectCourseLeaderboard.all() as unknown as CourseStat[];
+}
 
 export function listVents(visitorId: string): Vent[] {
   const rows = selectVents.all(visitorId) as Array<{
