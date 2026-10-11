@@ -128,3 +128,26 @@ it("resonating a vent broadcasts to other open sessions too, not just new vents"
 
   await readUntil(reader, decoder, leftover, "event: changed", 3_000);
 });
+
+it("a new vent updates the course leaderboard live too, off the same broadcast", async () => {
+  const poster = jar();
+  const watcher = jar();
+  const { reader, decoder, leftover } = await openEventStream(watcher);
+
+  // Uppercase suffix to match the app's course-name normalisation (see
+  // app/db.ts) — the leaderboard fragment never renders mixed case.
+  const course = `LIVECOURSE${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  await poster.fetch("/vents", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ course, body: `leaderboard push ${crypto.randomUUID()}` }).toString(),
+  });
+
+  await readUntil(reader, decoder, leftover, "event: changed", 3_000);
+
+  // The leaderboard has no per-visitor state to personalise, unlike the
+  // wall's own fragment — same broadcast, same "changed" ping, just a
+  // different fragment endpoint reacting to it.
+  const fragment = await watcher.fetch("/courses/fragment").then((r) => r.text());
+  expect(fragment).toContain(course);
+});
