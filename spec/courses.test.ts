@@ -82,3 +82,15 @@ it("normalises course names so the same course isn't split across rows by casing
   expect(occurrences, `"${base}" should appear once on the leaderboard, combining both vents`).toBe(1);
   expect(leaderboard).toContain("2 vents");
 });
+
+it("collapses internal whitespace runs so \"COMP  8020\" matches \"COMP 8020\"", async () => {
+  const author = jar();
+  const base = `SPACE ${crypto.randomUUID().slice(0, 8)}`;
+  await postVent(author, base, `one ${crypto.randomUUID()}`);
+  await postVent(author, base.replace(" ", "  "), `two ${crypto.randomUUID()}`);
+
+  const leaderboard = await author.fetch("/courses").then((r) => r.text());
+  const occurrences = leaderboard.split(base.toUpperCase()).length - 1;
+  expect(occurrences, `"${base}" should appear once on the leaderboard despite a double space`).toBe(1);
+  expect(leaderboard).toContain("2 vents");
+});

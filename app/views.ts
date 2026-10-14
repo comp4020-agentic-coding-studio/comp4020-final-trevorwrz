@@ -205,6 +205,33 @@ const pageStyles = `
       .course-stats { font-size: 0.85rem; color: var(--muted); text-align: right; white-space: nowrap; }
 `;
 
+// Shared by both pages' live-update listener: progressive enhancement only
+// (every form still works with no JS at all, via plain POST + 303 redirect),
+// this just re-fetches the page's own fragment when the shared SSE channel
+// pings "changed", so other people's changes show up without a reload per
+// crit 9's "within about a second, no reload" requirement.
+function liveUpdateScript(elementId: string, fragmentUrl: string): string {
+  return `
+    <script>
+      if (window.EventSource) {
+        const source = new EventSource("/events");
+        source.addEventListener("changed", async () => {
+          try {
+            const res = await fetch(${JSON.stringify(fragmentUrl)}, { credentials: "same-origin" });
+            if (!res.ok) return;
+            const html = await res.text();
+            const current = document.getElementById(${JSON.stringify(elementId)});
+            if (current) current.outerHTML = html;
+          } catch {
+            // A dropped fetch just means this tab stays stale until the next
+            // "changed" event or a manual reload — never worth surfacing to
+            // the visitor over an anonymous vent wall.
+          }
+        });
+      }
+    </script>`;
+}
+
 function courseRow(stat: CourseStat, rank: number): string {
   return `
     <li class="course-row">
@@ -246,23 +273,7 @@ export function renderCoursesPage(stats: CourseStat[]): string {
       </header>
       ${renderCourseList(stats)}
     </div>
-    <script>
-      if (window.EventSource) {
-        const source = new EventSource("/events");
-        source.addEventListener("changed", async () => {
-          try {
-            const res = await fetch("/courses/fragment", { credentials: "same-origin" });
-            if (!res.ok) return;
-            const html = await res.text();
-            const current = document.getElementById("courses-list");
-            if (current) current.outerHTML = html;
-          } catch {
-            // Same stance as the wall's own listener: a dropped fetch just
-            // means this tab stays stale until the next ping.
-          }
-        });
-      }
-    </script>
+    ${liveUpdateScript("courses-list", "/courses/fragment")}
   </body>
 </html>`;
 }
@@ -291,29 +302,7 @@ export function renderPage(vents: Vent[]): string {
       </form>
       ${renderVentList(vents)}
     </div>
-    <script>
-      // Progressive enhancement only: every form above still works with no
-      // JS at all (plain POST, 303 redirect, full page). This just makes
-      // OTHER people's changes show up without a reload, per crit 9's "within
-      // about a second, no reload" requirement — it never touches what the
-      // submitting visitor's own browser does with their own action.
-      if (window.EventSource) {
-        const source = new EventSource("/events");
-        source.addEventListener("changed", async () => {
-          try {
-            const res = await fetch("/vents/fragment", { credentials: "same-origin" });
-            if (!res.ok) return;
-            const html = await res.text();
-            const current = document.getElementById("vents");
-            if (current) current.outerHTML = html;
-          } catch {
-            // A dropped fetch just means this tab stays stale until the next
-            // "changed" event or a manual reload — never worth surfacing to
-            // the visitor over an anonymous vent wall.
-          }
-        });
-      }
-    </script>
+    ${liveUpdateScript("vents", "/vents/fragment")}
   </body>
 </html>`;
 }

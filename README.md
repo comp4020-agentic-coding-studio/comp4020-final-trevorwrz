@@ -9,7 +9,7 @@ to the top.
 This is the week 10 ("All at once") version: the wall is real-time now — a
 vent or a resonance posted in one tab shows up in every other open tab
 within about a second, with no reload. There's also a
-[course leaderboard](/courses/), ranking courses by total resonance across
+[course leaderboard](/courses), ranking courses by total resonance across
 their vents — the same "everyone agrees" effect, one level up from a single
 vent. Moderation tooling and the rest of the multi-user polish the final
 project eventually needs are still deliberately not here — see "What's

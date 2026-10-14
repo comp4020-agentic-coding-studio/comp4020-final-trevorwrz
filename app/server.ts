@@ -32,7 +32,7 @@ app.get("/courses/fragment", (_req, res) => {
 
 app.post("/vents", (req, res) => {
   getOrSetVisitorId(req, res);
-  const course = String(req.body.course ?? "").trim().slice(0, 80);
+  const course = String(req.body.course ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
   const body = String(req.body.body ?? "").trim().slice(0, 500);
   if (course && body) {
     createVent(course, body);
