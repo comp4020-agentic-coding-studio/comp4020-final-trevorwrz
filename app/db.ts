@@ -38,6 +38,15 @@ db.exec(`
   );
 `);
 
+// `CREATE TABLE IF NOT EXISTS` above is a no-op against the live deploy's
+// existing `vents` table (crit 8/9 data already lives in the volume), so the
+// new `visitor_id` column needs its own migration — added only if missing,
+// so this stays safe to run against a fresh table too.
+const ventColumns = db.prepare("PRAGMA table_info(vents)").all() as Array<{ name: string }>;
+if (!ventColumns.some((col) => col.name === "visitor_id")) {
+  db.exec("ALTER TABLE vents ADD COLUMN visitor_id TEXT NOT NULL DEFAULT ''");
+}
+
 const insertVent = db.prepare(
   "INSERT INTO vents (course, body, created_at, visitor_id) VALUES (?, ?, ?, ?)",
 );
