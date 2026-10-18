@@ -7,9 +7,12 @@ ANU course and others click "Resonate +1" if they agree, sorted so the
 complaint the most people share floats to the top. As of crit 9 it's also
 real-time (a change in one tab reaches every other open tab within about a
 second, no reload) and has a second view, the course leaderboard, ranking
-courses by total resonance. `README.md` argues what "good" means for it;
-this file is about how it got built and stays rewritten each crit to reflect
-where the project actually is, not a log of what happened when.
+courses by total resonance. As of crit 10 it also tells two visitors apart in
+one specific way: the visitor who posted a vent can delete it, and no one
+else can, enforced server-side and logged. `README.md` argues what "good"
+means for it; this file is about how it got built and stays rewritten each
+crit to reflect where the project actually is, not a log of what happened
+when.
 
 ## The decisions, in order
 
@@ -26,6 +29,11 @@ where the project actually is, not a log of what happened when.
   accounts) was rejected as the brief's named "median answer"; ranking
   courses by total resonance amplifies the app's actual value proposition
   instead of bolting on an unrelated feature.
+- [`0004-vent-ownership.md`](docs/decisions/0004-vent-ownership.md):
+  author-only vent deletion — the `visitor_id` that posted a vent is the only
+  one who can delete it, enforced in the SQL `WHERE` clause itself, not just
+  hidden from other visitors' UI. No accounts, no moderator role; both were
+  considered and rejected as bigger than what crit 10 actually asks for.
 
 ## How it was built
 
@@ -183,12 +191,62 @@ new plumbing: `listCourseLeaderboard()` in `app/db.ts`, `/courses` and
   not a timing issue to chase; the fix was uppercasing the generated course
   codes to match what the app actually stores.
 
+Crit 10 added a permission difference between two visitors, enforced
+server-side and logged, in commit order: the schema/query/logging layer
+([`7e07ae4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/7e07ae4)),
+then the route and the owner-only delete control
+([`fa95f8f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/fa95f8f)),
+then `spec/ownership.test.ts`
+([`af1cf20`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/af1cf20)),
+then the README/CLAUDE.md updates and the decision record
+([`e802f57`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-trevorwrz/commit/e802f57)).
+
+## Directing, grounding and correcting the agent's work (continued)
+
+**Telling two visitors apart (crit 10):**
+
+- I made the scoping call the brief leaves open — "who counts as a person,
+  and what can they do differently" — by re-reading `README.md`'s "anonymous,
+  always" commitment before accepting an easy answer. The agent's first
+  framing leaned toward a shared moderator role; I rejected it because it
+  reopens "who grants that role" with no account system to answer it, and
+  picked the smaller change the app's own data already supported: the
+  `visitor_id` that posts a vent becomes that vent's owner, able to delete
+  only their own.
+- I insisted the ownership check live in the database query itself
+  (`deleteVent`'s own `WHERE id = ? AND visitor_id = ?`), not as a check in
+  the route before calling a generic delete — the brief calls a
+  UI-only-hidden permission a critical finding, and a query that can't match
+  the wrong row is a stronger guarantee than a conditional in application
+  code that a later edit could accidentally skip.
+- I grounded the server-side enforcement by hand, not just via the spec: with
+  the dev server running, I posted a vent as one cookie jar, confirmed a
+  second, different cookie jar saw no delete control on it, then issued the
+  delete request directly against that vent's route from the second jar's
+  cookies and confirmed the server answered `403` and the vent was still
+  present afterward — the exact "one user can alter the other's data" failure
+  the brief treats as critical, checked by hand rather than assumed from a
+  green test.
+- I corrected a gap in the first routing draft: the delete route's initial
+  version always `redirect(303, "/")` regardless of outcome, which would have
+  looked identical to a stranger's denied attempt and a real network hiccup
+  in the logs. I asked for the rejected branch to answer `403` explicitly
+  instead of redirecting, so the log line and the HTTP response both say
+  "refused," not "something happened, who knows."
+- I checked the log output would actually narrate the crit, not just that it
+  existed: I ran the full local spec suite against a live `node
+  app/server.ts` and read the resulting stdout end to end, confirming two
+  different visitor prefixes were distinguishable across interleaved
+  `vent.created`/`vent.resonated`/`vent.delete.ok`/`vent.delete.denied`
+  lines, and that a denied delete read as clearly as an accepted one — the
+  actual thing the presenter has to read live from `flyctl logs`.
+
 ## What's next
 
 Crit 10 ("Fly by instruments") asks for multi-user: two classmates using the
 deployed URL at once while I watch via logs. The real-time layer and the
 leaderboard both already assume concurrent writers (the resonance dedup
 predates this crit; the SSE broadcast has no single-writer assumption baked
-in), so the work ahead is less "make it multi-user" and more "find out
-where that assumption is wrong" — deliberately trying to break simultaneous
-posts and resonances rather than just demonstrating the happy path.
+in), so the remaining work is deploying this change, then testing it against
+the live app from two separate Chrome profiles and confirming `flyctl logs`
+reads the way the crit demo needs it to.
