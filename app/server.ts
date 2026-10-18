@@ -1,10 +1,11 @@
 import express from "express";
 import { join } from "node:path";
-import { addResonance, createVent, listCourseLeaderboard, listVents } from "./db.ts";
+import { addResonance, createVent, deleteVent, listCourseLeaderboard, listVents } from "./db.ts";
 import { renderCourseList, renderCoursesPage, renderPage, renderVentList } from "./views.ts";
 import { renderReadme } from "./readme.ts";
 import { getOrSetVisitorId } from "./visitor.ts";
 import { addClient, broadcastChange, removeClient } from "./events.ts";
+import { logAction } from "./log.ts";
 
 const app = express();
 app.disable("x-powered-by");
@@ -31,11 +32,12 @@ app.get("/courses/fragment", (_req, res) => {
 });
 
 app.post("/vents", (req, res) => {
-  getOrSetVisitorId(req, res);
+  const visitorId = getOrSetVisitorId(req, res);
   const course = String(req.body.course ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
   const body = String(req.body.body ?? "").trim().slice(0, 500);
   if (course && body) {
-    createVent(course, body);
+    createVent(course, body, visitorId);
+    logAction("vent.created", { visitorId, course });
     broadcastChange();
   }
   res.redirect(303, "/");
@@ -46,8 +48,31 @@ app.post("/vents/:id/resonate", (req, res) => {
   const ventId = Number(req.params.id);
   if (Number.isInteger(ventId)) {
     addResonance(ventId, visitorId);
+    logAction("vent.resonated", { visitorId, ventId });
     broadcastChange();
   }
+  res.redirect(303, "/");
+});
+
+// Server-side ownership check, not a UI-only hint: deleteVent()'s own SQL
+// WHERE clause is what actually refuses a non-owner's request (see app/db.ts)
+// — crit 10's spec treats a client-side-only permission check as a critical
+// finding, so this route trusts nothing from the request except the visitor's
+// own cookie identity to decide who owns what.
+app.post("/vents/:id/delete", (req, res) => {
+  const visitorId = getOrSetVisitorId(req, res);
+  const ventId = Number(req.params.id);
+  if (!Number.isInteger(ventId)) {
+    res.redirect(303, "/");
+    return;
+  }
+  const deleted = deleteVent(ventId, visitorId);
+  logAction(deleted ? "vent.delete.ok" : "vent.delete.denied", { visitorId, ventId });
+  if (!deleted) {
+    res.status(403).type("text/plain").send("not the owner of this vent");
+    return;
+  }
+  broadcastChange();
   res.redirect(303, "/");
 });
 

@@ -16,13 +16,27 @@ function ventRow(vent: Vent): string {
          <button type="submit">✨ Resonate +1</button>
        </form>`;
 
+  // Shown only to the visitor whose own visitor_id created this vent
+  // (`isOwner`, computed server-side in app/db.ts's listVents) — a hint for
+  // this visitor, not the enforcement itself: POST /vents/:id/delete repeats
+  // the same ownership check against the stored row regardless of what this
+  // markup renders, per docs/decisions/0004-vent-ownership.md.
+  const deleteControl = vent.isOwner
+    ? `<form method="post" action="/vents/${vent.id}/delete" class="delete-form">
+         <button type="submit">🗑️ Delete</button>
+       </form>`
+    : "";
+
   return `
     <li class="vent">
       <p class="vent-course">${escapeHtml(vent.course)}</p>
       <p class="vent-body">${escapeHtml(vent.body)}</p>
       <div class="vent-meta">
         <span class="vent-count">Resonance ${vent.resonanceCount}</span>
-        ${button}
+        <div class="vent-actions">
+          ${button}
+          ${deleteControl}
+        </div>
       </div>
     </li>`;
 }
@@ -160,6 +174,7 @@ const pageStyles = `
       .vent-body { margin: 0 0 0.75rem; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
       .vent-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
       .vent-count { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+      .vent-actions { display: flex; align-items: center; gap: 0.5rem; }
       .resonate-form { margin: 0; }
       .resonate-form button {
         font-size: 0.85rem;
@@ -172,6 +187,18 @@ const pageStyles = `
       }
       .resonate-form button:hover { transform: translateY(-1px); background: #fdf4ff; }
       .resonated { font-size: 0.85rem; color: var(--muted); }
+      .delete-form { margin: 0; }
+      .delete-form button {
+        font-size: 0.85rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: #fff;
+        cursor: pointer;
+        color: #b91c1c;
+        transition: transform 0.15s ease, background 0.15s ease;
+      }
+      .delete-form button:hover { transform: translateY(-1px); background: #fef2f2; }
       li.empty {
         text-align: center;
         color: var(--muted);
