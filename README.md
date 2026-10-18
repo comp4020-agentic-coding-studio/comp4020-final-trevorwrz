@@ -31,9 +31,14 @@ more courses mixed in.
   deadline, a format, a workload — not about a named tutor, lecturer, or
   classmate. The app doesn't enforce this (no NLP moderation this week); the
   README says the norm, and that's the contract visitors agree to by posting.
-- **Permanent.** A vent posted here stays. No expiry, no "top complaints of
-  the week" that bury older ones — if it's still gaining resonance, it's
-  still relevant.
+- **Permanent, unless you're the one who posted it.** A vent stays — no
+  expiry, no "top complaints of the week" that bury older ones — with one
+  exception: the visitor who posted a vent can delete it. That's not
+  moderation (no one else can touch it) and it's not editing (there's no
+  update, only gone-or-not); it's the smallest way to let a vent's author
+  take it back without inventing accounts, usernames, or anyone else's
+  authority over anyone else's post. See
+  `docs/decisions/0004-vent-ownership.md`.
 - **One voice, one resonance.** Each vent can be resonated at most once per
   visitor, so the ranking reflects how many people agree, not how many times
   one person clicked.
