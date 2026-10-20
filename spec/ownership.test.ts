@@ -80,3 +80,33 @@ it("a visitor never sees a delete control on a vent they don't own", async () =>
   const ownBlock = ownPage.slice(ownPage.indexOf(marker));
   expect(ownBlock).toContain("/delete");
 });
+
+// The ownership check only means what it claims if the identity it checks
+// against can't be forged or crashed by a crafted Cookie header — no real
+// browser sends either of these, but nothing on the wire stops a client
+// from doing so, and both reach getOrSetVisitorId() on every single route.
+it("a malformed visitor_id cookie doesn't 500 the request", async () => {
+  const res = await fetch(new URL("/", baseUrl), {
+    headers: { cookie: "visitor_id=%" },
+  });
+  expect(res.status).toBe(200);
+});
+
+it("an oversized visitor_id cookie is never trusted as an identity or stored", async () => {
+  const forged = "a".repeat(9000);
+  const marker = `forged-cookie-${crypto.randomUUID()}`;
+  const res = await fetch(new URL("/vents", baseUrl), {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: `visitor_id=${forged}`,
+    },
+    body: new URLSearchParams({ course: "COMP8020", body: marker }).toString(),
+    redirect: "manual",
+  });
+  expect(res.status).toBe(303);
+  // A trusted forged value would echo back in Set-Cookie (or set none at
+  // all); a rejected one gets reissued a fresh, real identity instead.
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  expect(setCookie).not.toContain(forged);
+});
