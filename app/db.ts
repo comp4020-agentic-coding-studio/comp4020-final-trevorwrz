@@ -12,6 +12,8 @@ export interface Vent {
   isOwner: boolean;
 }
 
+export type SortMode = "hot" | "new";
+
 export interface CourseStat {
   course: string;
   ventCount: number;
@@ -63,7 +65,11 @@ const deleteResonancesForVent = db.prepare(
   "DELETE FROM resonances WHERE vent_id = ?",
 );
 
-const selectVents = db.prepare(`
+// Shared by both sort orders below: same columns, same join, same grouping
+// — only the ORDER BY differs, so the two are kept as separate prepared
+// statements (SQLite can't parameterise an ORDER BY clause) rather than
+// building a query string from user input.
+const selectVentsBase = `
   SELECT
     v.id AS id,
     v.course AS course,
@@ -75,8 +81,10 @@ const selectVents = db.prepare(`
   FROM vents v
   LEFT JOIN resonances r ON r.vent_id = v.id
   GROUP BY v.id
-  ORDER BY resonanceCount DESC, v.created_at DESC
-`);
+`;
+
+const selectVentsByHot = db.prepare(`${selectVentsBase} ORDER BY resonanceCount DESC, v.created_at DESC`);
+const selectVentsByNew = db.prepare(`${selectVentsBase} ORDER BY v.created_at DESC`);
 
 // Grouped by UPPER(TRIM(course)) rather than the raw column: the course
 // field is free text (README's "what's deferred" already flags this), and
@@ -97,8 +105,9 @@ export function listCourseLeaderboard(): CourseStat[] {
   return selectCourseLeaderboard.all() as unknown as CourseStat[];
 }
 
-export function listVents(visitorId: string): Vent[] {
-  const rows = selectVents.all(visitorId) as Array<{
+export function listVents(visitorId: string, sort: SortMode = "hot"): Vent[] {
+  const stmt = sort === "new" ? selectVentsByNew : selectVentsByHot;
+  const rows = stmt.all(visitorId) as Array<{
     id: number;
     course: string;
     body: string;

@@ -1,4 +1,4 @@
-import type { CourseStat, Vent } from "./db.ts";
+import type { CourseStat, SortMode, Vent } from "./db.ts";
 
 export function escapeHtml(input: string): string {
   return input
@@ -214,6 +214,26 @@ const pageStyles = `
         flex-wrap: wrap;
         margin: 0.1rem 0 0.4rem;
       }
+      .sort-toggle {
+        display: flex;
+        gap: 0.5rem;
+        margin: 0 0 0.85rem;
+      }
+      .sort-option {
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.35rem 0.8rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .sort-option.active {
+        background: linear-gradient(135deg, var(--accent1), var(--accent2));
+        color: #fff;
+        border-color: transparent;
+      }
       ol.course-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
       .course-row {
         display: flex;
@@ -257,6 +277,24 @@ function liveUpdateScript(elementId: string, fragmentUrl: string): string {
         });
       }
     </script>`;
+}
+
+// A plain link to the same page with ?sort= set, not a JS-driven control:
+// it works with no JS (a full navigation re-renders the page already
+// sorted server-side), and it's what tells the live-update listener below
+// which fragment URL to keep polling, so a live "changed" ping during
+// crit 10's two-visitor demo doesn't silently snap the list back to the
+// other order.
+function sortToggle(sort: SortMode): string {
+  const option = (value: SortMode, label: string) =>
+    `<a href="/?sort=${value}" class="sort-option${sort === value ? " active" : ""}"${
+      sort === value ? ' aria-current="true"' : ""
+    }>${label}</a>`;
+  return `
+    <div class="sort-toggle" role="group" aria-label="Sort vents">
+      ${option("hot", "🔥 Hot")}
+      ${option("new", "🕐 New")}
+    </div>`;
 }
 
 function courseRow(stat: CourseStat, rank: number): string {
@@ -305,7 +343,7 @@ export function renderCoursesPage(stats: CourseStat[]): string {
 </html>`;
 }
 
-export function renderPage(vents: Vent[]): string {
+export function renderPage(vents: Vent[], sort: SortMode = "hot"): string {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -327,9 +365,10 @@ export function renderPage(vents: Vent[]): string {
         <textarea name="body" placeholder="Vent anonymously… go after the issue, not the person" maxlength="500" rows="3" required></textarea>
         <button type="submit">Post anonymously</button>
       </form>
+      ${sortToggle(sort)}
       ${renderVentList(vents)}
     </div>
-    ${liveUpdateScript("vents", "/vents/fragment")}
+    ${liveUpdateScript("vents", `/vents/fragment?sort=${sort}`)}
   </body>
 </html>`;
 }

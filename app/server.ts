@@ -1,6 +1,6 @@
 import express from "express";
 import { join } from "node:path";
-import { addResonance, createVent, deleteVent, listCourseLeaderboard, listVents } from "./db.ts";
+import { addResonance, createVent, deleteVent, listCourseLeaderboard, listVents, type SortMode } from "./db.ts";
 import { renderCourseList, renderCoursesPage, renderPage, renderVentList } from "./views.ts";
 import { renderReadme } from "./readme.ts";
 import { getOrSetVisitorId } from "./visitor.ts";
@@ -13,14 +13,24 @@ app.use(express.urlencoded({ extended: false }));
 
 const readmePath = join(import.meta.dirname, "..", "README.md");
 
+// An allowlist, not a passthrough: anything other than the one other known
+// value falls back to the default rather than reaching the database, so a
+// query string can't do anything but pick between two fixed prepared
+// statements (see app/db.ts's listVents()).
+function parseSort(value: unknown): SortMode {
+  return value === "new" ? "new" : "hot";
+}
+
 app.get("/", (req, res) => {
   const visitorId = getOrSetVisitorId(req, res);
-  res.type("html").send(renderPage(listVents(visitorId)));
+  const sort = parseSort(req.query.sort);
+  res.type("html").send(renderPage(listVents(visitorId, sort), sort));
 });
 
 app.get("/vents/fragment", (req, res) => {
   const visitorId = getOrSetVisitorId(req, res);
-  res.type("html").send(renderVentList(listVents(visitorId)));
+  const sort = parseSort(req.query.sort);
+  res.type("html").send(renderVentList(listVents(visitorId, sort)));
 });
 
 app.get("/courses", (_req, res) => {
