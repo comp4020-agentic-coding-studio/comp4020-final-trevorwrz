@@ -279,6 +279,27 @@ function liveUpdateScript(elementId: string, fragmentUrl: string): string {
     </script>`;
 }
 
+// Progressive enhancement only: the input's own pattern/title attributes
+// already enforce and describe the course-code shape with no JS at all, so
+// the field still works exactly the same with scripting off. This just
+// replaces the browser's built-in validation bubble — whose wording follows
+// the visitor's OS/browser locale, not this page's language — with a fixed
+// English message via setCustomValidity(), so the crit capture never shows a
+// non-English prompt regardless of whose machine renders it.
+function courseInputValidationScript(): string {
+  return `
+    <script>
+      (() => {
+        const input = document.getElementById("course-input");
+        if (!input) return;
+        const message = "Enter a course code, e.g. COMP8020";
+        const check = () => input.setCustomValidity(input.validity.patternMismatch ? message : "");
+        input.addEventListener("input", check);
+        input.addEventListener("invalid", check);
+      })();
+    </script>`;
+}
+
 // A plain link to the same page with ?sort= set, not a JS-driven control:
 // it works with no JS (a full navigation re-renders the page already
 // sorted server-side), and it's what tells the live-update listener below
@@ -363,6 +384,7 @@ export function renderPage(vents: Vent[], sort: SortMode = "hot"): string {
       <form method="post" action="/vents" class="post-form">
         <input
           type="text"
+          id="course-input"
           name="course"
           placeholder="Course code, e.g. COMP8020"
           maxlength="80"
@@ -373,6 +395,7 @@ export function renderPage(vents: Vent[], sort: SortMode = "hot"): string {
         <textarea name="body" placeholder="Vent anonymously… go after the issue, not the person" maxlength="500" rows="3" required></textarea>
         <button type="submit">Post anonymously</button>
       </form>
+      ${courseInputValidationScript()}
       ${sortToggle(sort)}
       ${renderVentList(vents)}
     </div>
