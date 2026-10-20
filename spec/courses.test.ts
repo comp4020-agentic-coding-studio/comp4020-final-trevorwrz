@@ -38,13 +38,22 @@ async function findVentId(page: string, marker: string): Promise<string> {
   return match[1];
 }
 
+// A course code shape the server now requires (see app/server.ts's
+// isValidCourseCode): 2-6 letters then 4 digits. Tests that need a unique,
+// collision-free "course" use this instead of arbitrary free text so they
+// keep exercising the real validated path.
+function fakeCourseCode(prefix: string): string {
+  const digits = crypto.randomUUID().replace(/\D/g, "").slice(0, 4).padEnd(4, "0");
+  return `${prefix}${digits}`;
+}
+
 it("ranks courses by total resonance across their vents, not just vent count", async () => {
   const author = jar();
-  // Uppercase suffixes: the app normalises course names to upper case (see
+  // Uppercase prefixes: the app normalises course names to upper case (see
   // app/db.ts), so a mixed-case marker here would never match what the
   // leaderboard actually renders.
-  const quietCourse = `QUIET${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-  const popularCourse = `POPULAR${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  const quietCourse = fakeCourseCode("QT");
+  const popularCourse = fakeCourseCode("PP");
 
   // The quiet course gets three vents that nobody resonates.
   for (let i = 0; i < 3; i++) {
@@ -73,7 +82,7 @@ it("ranks courses by total resonance across their vents, not just vent count", a
 
 it("normalises course names so the same course isn't split across rows by casing or whitespace", async () => {
   const author = jar();
-  const base = `NORM${crypto.randomUUID().slice(0, 8)}`;
+  const base = fakeCourseCode("NM");
   await postVent(author, base, `one ${crypto.randomUUID()}`);
   await postVent(author, ` ${base.toLowerCase()} `, `two ${crypto.randomUUID()}`);
 
@@ -85,7 +94,8 @@ it("normalises course names so the same course isn't split across rows by casing
 
 it("collapses internal whitespace runs so \"COMP  8020\" matches \"COMP 8020\"", async () => {
   const author = jar();
-  const base = `SPACE ${crypto.randomUUID().slice(0, 8)}`;
+  const digits = crypto.randomUUID().replace(/\D/g, "").slice(0, 4).padEnd(4, "0");
+  const base = `SP ${digits}`;
   await postVent(author, base, `one ${crypto.randomUUID()}`);
   await postVent(author, base.replace(" ", "  "), `two ${crypto.randomUUID()}`);
 
@@ -93,4 +103,14 @@ it("collapses internal whitespace runs so \"COMP  8020\" matches \"COMP 8020\"",
   const occurrences = leaderboard.split(base.toUpperCase()).length - 1;
   expect(occurrences, `"${base}" should appear once on the leaderboard despite a double space`).toBe(1);
   expect(leaderboard).toContain("2 vents");
+});
+
+it("rejects a course value that isn't shaped like a course code", async () => {
+  const author = jar();
+  const marker = `garbage gripe ${crypto.randomUUID()}`;
+  const res = await postVent(author, `norm${crypto.randomUUID().slice(0, 8)}`, marker);
+  expect(res.status).toBe(303);
+
+  const page = await author.fetch("/").then((r) => r.text());
+  expect(page, "a vent with a non-course-code value should not be posted").not.toContain(marker);
 });

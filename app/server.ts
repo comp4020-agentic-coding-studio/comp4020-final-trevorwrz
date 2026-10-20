@@ -21,6 +21,18 @@ function parseSort(value: unknown): SortMode {
   return value === "new" ? "new" : "hot";
 }
 
+// An ANU course code shape (e.g. COMP8020), not a real-course lookup — the
+// README's "What's deferred" already names checking against an actual course
+// list as future work. This just stops the field being pure free text, so a
+// vent can't be filed under garbled characters that aren't a course code at
+// all. Case- and whitespace-insensitive: db.ts normalises with
+// UPPER(TRIM(...)) for the leaderboard, so the check does the same.
+const COURSE_CODE_PATTERN = /^[A-Z]{2,6}\s?\d{4}$/;
+
+function isValidCourseCode(course: string): boolean {
+  return COURSE_CODE_PATTERN.test(course.toUpperCase());
+}
+
 app.get("/", (req, res) => {
   const visitorId = getOrSetVisitorId(req, res);
   const sort = parseSort(req.query.sort);
@@ -45,10 +57,12 @@ app.post("/vents", (req, res) => {
   const visitorId = getOrSetVisitorId(req, res);
   const course = String(req.body.course ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
   const body = String(req.body.body ?? "").trim().slice(0, 500);
-  if (course && body) {
+  if (course && body && isValidCourseCode(course)) {
     createVent(course, body, visitorId);
     logAction("vent.created", { visitorId, course });
     broadcastChange();
+  } else if (course && body) {
+    logAction("vent.rejected", { visitorId, course });
   }
   res.redirect(303, "/");
 });

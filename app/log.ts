@@ -5,7 +5,7 @@
 // read as two distinct identities in the stream, and the attempted/rejected
 // case is logged exactly like a success so a denied cross-visitor delete is
 // visible too, not just the ones that succeed.
-type Action = "vent.created" | "vent.resonated" | "vent.delete.ok" | "vent.delete.denied";
+type Action = "vent.created" | "vent.rejected" | "vent.resonated" | "vent.delete.ok" | "vent.delete.denied";
 
 // visitor_id is a random UUID, not something anyone would correlate across
 // sessions anyway, but logging only a short prefix (enough to tell two

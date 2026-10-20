@@ -134,9 +134,10 @@ it("a new vent updates the course leaderboard live too, off the same broadcast",
   const watcher = jar();
   const { reader, decoder, leftover } = await openEventStream(watcher);
 
-  // Uppercase suffix to match the app's course-name normalisation (see
-  // app/db.ts) — the leaderboard fragment never renders mixed case.
-  const course = `LIVECOURSE${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  // Shaped like a real course code (the server validates this — see
+  // app/server.ts's isValidCourseCode), with digits unique enough to find
+  // this one vent's push on the leaderboard.
+  const course = `LV${crypto.randomUUID().replace(/\D/g, "").slice(0, 4).padEnd(4, "0")}`;
   await poster.fetch("/vents", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },

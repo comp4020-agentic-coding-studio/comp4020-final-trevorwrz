@@ -361,7 +361,15 @@ export function renderPage(vents: Vent[], sort: SortMode = "hot"): string {
         <p class="nav-links"><a href="/courses">🏆 Course leaderboard</a> · <a href="/readme/">What is this / Rules</a></p>
       </header>
       <form method="post" action="/vents" class="post-form">
-        <input type="text" name="course" placeholder="Course code, e.g. COMP8020" maxlength="80" required />
+        <input
+          type="text"
+          name="course"
+          placeholder="Course code, e.g. COMP8020"
+          maxlength="80"
+          pattern="\s*[A-Za-z]{2,6}\s*\d{4}\s*"
+          title="A course code, e.g. COMP8020"
+          required
+        />
         <textarea name="body" placeholder="Vent anonymously… go after the issue, not the person" maxlength="500" rows="3" required></textarea>
         <button type="submit">Post anonymously</button>
       </form>
